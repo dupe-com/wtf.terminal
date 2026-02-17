@@ -10,38 +10,41 @@ wtf_codex_find_session() {
 
   [[ -d "$codex_sessions" ]] || return 1
 
-  # Find the most recent session file whose cwd matches target_dir
   local latest_file=""
 
   # Search recent session files (sorted by mtime, newest first)
   local session_file
   for session_file in "$codex_sessions"/**/*.jsonl(N.om[1,50]); do
     local cwd
-    cwd=$(jq -r '.payload.cwd // empty' <<< "$(command head -1 "$session_file")" 2>/dev/null)
+    cwd=$(command head -1 "$session_file" 2>/dev/null | command jq -r '.payload.cwd // empty' 2>/dev/null)
     [[ -z "$cwd" ]] && continue
+
+    [[ -n "$WTF_DEBUG" ]] && print -u2 "  codex: $cwd"
 
     # Match if session cwd starts with target_dir
     if [[ "$cwd" == "$target_dir"* ]]; then
       latest_file="$session_file"
-      break  # Already sorted by mtime, first match is newest
+      break
     fi
   done
 
   [[ -z "$latest_file" ]] && return 1
 
-  # Extract metadata from session_meta line (first line)
+  [[ -n "$WTF_DEBUG" ]] && print -u2 "  codex: matched $latest_file"
+
+  # Extract metadata from first line
   local meta
-  meta=$(command head -1 "$latest_file")
+  meta=$(command head -1 "$latest_file" 2>/dev/null)
 
   WTF_PROVIDER="codex"
   WTF_SESSION_PATH="$latest_file"
-  WTF_PROJECT_PATH=$(jq -r '.payload.cwd // empty' <<< "$meta" 2>/dev/null)
-  WTF_GIT_BRANCH=$(jq -r '.payload.git.branch // empty' <<< "$meta" 2>/dev/null)
-  WTF_MODIFIED=$(jq -r '.payload.timestamp // empty' <<< "$meta" 2>/dev/null)
+  WTF_PROJECT_PATH=$(print -r -- "$meta" | command jq -r '.payload.cwd // empty' 2>/dev/null)
+  WTF_GIT_BRANCH=$(print -r -- "$meta" | command jq -r '.payload.git.branch // empty' 2>/dev/null)
+  WTF_MODIFIED=$(print -r -- "$meta" | command jq -r '.payload.timestamp // empty' 2>/dev/null)
 
   # Extract last user message and last assistant message from tail
   local extracted
-  extracted=$(command tail -100 "$latest_file" | jq -rs '
+  extracted=$(command tail -100 "$latest_file" | command jq -rs '
     {
       last_human: (
         [.[] | select(.payload.role? == "user" and .payload.type? == "message")
@@ -63,7 +66,7 @@ wtf_codex_find_session() {
 
   # First prompt fallback
   if [[ -z "$WTF_LAST_HUMAN" ]]; then
-    WTF_FIRST_PROMPT=$(command head -20 "$latest_file" | jq -rs '
+    WTF_FIRST_PROMPT=$(command head -20 "$latest_file" | command jq -rs '
       [.[] | select(.payload.role? == "user" and .payload.type? == "message")
        | .payload.content[]? | select(.type == "input_text") | .text
        | select(startswith("<") | not)]
