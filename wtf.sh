@@ -1,70 +1,124 @@
 #!/usr/bin/env zsh
 # wtf.sh — Entry point for wtf.terminal
-# Source this file in your .zshrc to get the `?` command.
+# Source this file in your .zshrc to get the `?` and `wtfctx` commands.
 
 WTF_DIR="${0:A:h}"
 
 source "$WTF_DIR/lib/wtf-resolve.sh"
 source "$WTF_DIR/lib/wtf-extract.sh"
 source "$WTF_DIR/lib/wtf-format.sh"
-source "$WTF_DIR/lib/wtf-cache.sh"
+source "$WTF_DIR/lib/wtf-codex.sh"
+source "$WTF_DIR/lib/wtf-opencode.sh"
 
-function \? {
-  # 1. Resolve CWD to a Claude project dir
-  local project_dir
-  project_dir=$(wtf_resolve_project_dir) || {
+# Convert any modified timestamp to epoch seconds for comparison.
+_wtf_to_epoch() {
+  local ts="$1"
+  [[ -z "$ts" ]] && echo 0 && return
+
+  if [[ "$ts" == *T* ]]; then
+    date -j -f "%Y-%m-%dT%H:%M:%S" "${ts%%.*}" +%s 2>/dev/null || echo 0
+  elif (( ts > 9999999999 )); then
+    # epoch ms
+    echo $(( ts / 1000 ))
+  else
+    echo "$ts"
+  fi
+}
+
+wtfctx() {
+  # 1. Find project root (git root or CWD)
+  wtf_resolve_project_root
+  local project_root="$WTF_PROJECT_ROOT"
+  local project_name="${project_root:t}"
+
+  # 2. Try all providers, track the most recent session
+  local best_provider=""
+  local best_epoch=0
+  local best_modified="" best_summary="" best_last_human=""
+  local best_git_branch="" best_project_path="" best_session_path=""
+  local best_first_prompt=""
+
+  # --- Claude Code ---
+  local claude_dir
+  claude_dir=$(wtf_resolve_claude "$project_root")
+  if [[ $? -eq 0 ]]; then
+    wtf_find_latest_session "$claude_dir"
+    if [[ $? -eq 0 ]]; then
+      local epoch=$(_wtf_to_epoch "$WTF_MODIFIED")
+      if (( epoch > best_epoch )); then
+        best_epoch=$epoch
+        best_provider="claude"
+        best_modified="$WTF_MODIFIED"
+        best_summary="$WTF_SUMMARY"
+        best_git_branch="$WTF_GIT_BRANCH"
+        best_project_path="$WTF_PROJECT_PATH"
+        best_session_path="$WTF_SESSION_PATH"
+        best_first_prompt="$WTF_FIRST_PROMPT"
+        best_last_human=""  # extracted separately below
+      fi
+    fi
+  fi
+
+  # --- Codex ---
+  wtf_codex_find_session "$project_root"
+  if [[ $? -eq 0 ]]; then
+    local epoch=$(_wtf_to_epoch "$WTF_MODIFIED")
+    if (( epoch > best_epoch )); then
+      best_epoch=$epoch
+      best_provider="codex"
+      best_modified="$WTF_MODIFIED"
+      best_summary="$WTF_SUMMARY"
+      best_git_branch="$WTF_GIT_BRANCH"
+      best_project_path="$WTF_PROJECT_PATH"
+      best_session_path="$WTF_SESSION_PATH"
+      best_first_prompt="$WTF_FIRST_PROMPT"
+      best_last_human="$WTF_LAST_HUMAN"
+    fi
+  fi
+
+  # --- OpenCode ---
+  wtf_opencode_find_session "$project_root"
+  if [[ $? -eq 0 ]]; then
+    local epoch=$(_wtf_to_epoch "$WTF_MODIFIED")
+    if (( epoch > best_epoch )); then
+      best_epoch=$epoch
+      best_provider="opencode"
+      best_modified="$WTF_MODIFIED"
+      best_summary="$WTF_SUMMARY"
+      best_git_branch="$WTF_GIT_BRANCH"
+      best_project_path="$WTF_PROJECT_PATH"
+      best_session_path="$WTF_SESSION_PATH"
+      best_first_prompt="$WTF_FIRST_PROMPT"
+      best_last_human="$WTF_LAST_HUMAN"
+    fi
+  fi
+
+  # 3. No sessions found anywhere
+  if [[ -z "$best_provider" ]]; then
     echo "? no sessions found for this directory"
     return 1
-  }
-
-  # Derive project name from the encoded dir name
-  local encoded_name="${project_dir:t}"
-  local project_name="${encoded_name##*-}"  # last path component
-
-  # 2. Find latest session
-  wtf_find_latest_session "$project_dir" || {
-    echo "? no sessions in index"
-    return 1
-  }
-
-  # Better project name from session metadata
-  if [[ -n "$WTF_PROJECT_PATH" ]]; then
-    project_name="${WTF_PROJECT_PATH:t}"
   fi
 
-  # Cache key based on encoded project dir name
-  local cache_key="$encoded_name"
-
-  local summary last_human modified git_branch
-
-  # 3. Check cache (stores raw data, not rendered output)
-  if wtf_cache_read "$WTF_SESSION_PATH" "$cache_key"; then
-    project_name="$WTF_CACHED_PROJECT_NAME"
-    summary="$WTF_CACHED_SUMMARY"
-    last_human="$WTF_CACHED_LAST_HUMAN"
-    modified="$WTF_CACHED_MODIFIED"
-    git_branch="$WTF_CACHED_GIT_BRANCH"
-  else
-    # 4. Extract messages from session
-    wtf_extract_messages "$WTF_SESSION_PATH"
-
-    summary="$WTF_SUMMARY"
-    last_human="${WTF_LAST_HUMAN:-$WTF_FIRST_PROMPT}"
-    modified="$WTF_MODIFIED"
-    git_branch="$WTF_GIT_BRANCH"
-
-    # Write raw data to cache
-    wtf_cache_write "$WTF_SESSION_PATH" "$cache_key" \
-      "$project_name" "$summary" "$last_human" "$modified" "$git_branch"
+  # 4. For Claude, extract messages (Codex/OpenCode already extracted)
+  if [[ "$best_provider" == "claude" ]]; then
+    wtf_extract_messages "$best_session_path"
+    best_last_human="${WTF_LAST_HUMAN:-$best_first_prompt}"
   fi
 
-  # 5. Compute display values (always fresh — respects TTY/NO_COLOR)
+  # Use git root name for project name (not session's subdirectory)
+  # Only fall back to session metadata if no git root
+
+  # 5. Compute display values
   local time_ago
-  time_ago=$(wtf_time_ago "$modified")
+  time_ago=$(wtf_time_ago "$best_modified")
 
   local git_info
-  git_info=$(wtf_git_info "$git_branch")
+  git_info=$(wtf_git_info "$best_git_branch")
 
-  # 6. Format and print
-  wtf_format "$project_name" "$git_info" "$time_ago" "$summary" "$last_human"
+  # 6. Format and print (provider shown as dim tag)
+  wtf_format "$project_name" "$git_info" "$time_ago" "$best_summary" "$best_last_human" "$best_provider"
 }
+
+# Make ? work as a command despite being a zsh glob character.
+disable -p '?'
+alias '?'='wtfctx'

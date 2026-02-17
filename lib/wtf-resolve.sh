@@ -1,24 +1,34 @@
 #!/usr/bin/env zsh
-# wtf-resolve.sh — CWD → Claude project dir resolution
+# wtf-resolve.sh — CWD → project directory resolution
 
-# Walk up from $PWD to /, encode each path, check for sessions-index.json.
-# Returns the Claude project dir (deepest match) or exits 1.
-wtf_resolve_project_dir() {
-  local dir="${1:-$PWD}"
+# Find the project root for the current directory.
+# Uses git root if available, otherwise exact CWD.
+# Sets WTF_PROJECT_ROOT.
+wtf_resolve_project_root() {
+  local git_root
+  git_root=$(git rev-parse --show-toplevel 2>/dev/null)
+
+  if [[ -n "$git_root" ]]; then
+    WTF_PROJECT_ROOT="$git_root"
+    return 0
+  fi
+
+  # Non-git fallback: use CWD
+  WTF_PROJECT_ROOT="$PWD"
+  return 0
+}
+
+# Check if Claude Code has sessions for a given directory.
+# Returns the Claude project dir path or exits 1.
+wtf_resolve_claude() {
+  local target_dir="$1"
   local claude_base="$HOME/.claude/projects"
+  local encoded="${target_dir//\//-}"
+  local index_file="$claude_base/$encoded/sessions-index.json"
 
-  while [[ "$dir" != "/" ]]; do
-    # Encode: /Users/ramin/Work/foo → -Users-ramin-Work-foo
-    local encoded="${dir//\//-}"
-    local index_file="$claude_base/$encoded/sessions-index.json"
-
-    if [[ -f "$index_file" ]]; then
-      echo "$claude_base/$encoded"
-      return 0
-    fi
-
-    dir="${dir:h}"  # zsh: parent directory
-  done
-
+  if [[ -f "$index_file" ]]; then
+    echo "$claude_base/$encoded"
+    return 0
+  fi
   return 1
 }

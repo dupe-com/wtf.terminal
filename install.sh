@@ -1,7 +1,7 @@
 #!/usr/bin/env bash
 # install.sh — Install wtf.terminal
 # Usage:
-#   curl -sSL https://raw.githubusercontent.com/ramin/wtf.terminal/main/install.sh | bash
+#   curl -sSL https://raw.githubusercontent.com/dupe-com/wtf.terminal/main/install.sh | bash
 #   — or —
 #   git clone ... && ./install.sh
 
@@ -55,4 +55,4 @@ fi
 info "Done! Open a new terminal or run:"
 echo "  source $ZSHRC"
 echo ""
-echo "Then type ? in any directory with Claude Code sessions."
+echo "Then type '?' in any directory with Claude Code sessions."

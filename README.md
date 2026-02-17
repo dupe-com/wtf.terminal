@@ -4,14 +4,22 @@ Context recall for terminal sessions. Type `?` to remember what you were doing.
 
 ```
 ━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━
- ? my-project  ·  feature/auth+3 unstaged  ·  4m ago
+ ? my-project  ·  feature/auth+3 unstaged  ·  4m ago  via claude
 ━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━
  Adding OAuth2 login flow to user service
  last asked: can you add the refresh token rotation logic...
 ━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━
 ```
 
-Developers lose context constantly when switching between terminal tabs. wtf.terminal reads your [Claude Code](https://docs.anthropic.com/en/docs/claude-code) session files from disk and gives you a quick summary — no API calls, no latency.
+Developers lose context constantly when switching between terminal tabs. wtf.terminal reads session files from your AI coding tools and gives you a quick summary — no API calls, no latency.
+
+## Supported Tools
+
+- **Claude Code** — reads from `~/.claude/projects/`
+- **OpenAI Codex CLI** — reads from `~/.codex/sessions/`
+- **OpenCode** — reads from `~/.local/share/opencode/opencode.db`
+
+Automatically picks the most recent session across all installed tools.
 
 ## Install
 
@@ -30,28 +38,30 @@ Then restart your terminal or `source ~/.zshrc`.
 ## Usage
 
 ```sh
-?          # Show context for current directory
+?              # Show context for current directory
+wtfctx         # Same thing, no alias needed
 ```
 
-That's it. `cd` into any project directory where you've used Claude Code, type `?`.
+`cd` into any project directory where you've used an AI coding tool and type `?`.
 
 ## What it shows
 
-- **Project name** — derived from your working directory
+- **Project name** — from your git root directory
 - **Git branch** + unstaged file count (live from your repo)
 - **Time since last session** — relative ("4m ago", "2h ago")
-- **Session summary** — from Claude Code's session index
-- **Last question** — the last thing you asked Claude
+- **Session summary** — what you were working on
+- **Last question** — the last thing you asked
+- **Provider** — which tool the session came from
 
 ## How it works
 
-1. Walks up from `$PWD` to find a matching Claude Code project in `~/.claude/projects/`
-2. Reads the `sessions-index.json` to find the latest non-sidechain session
-3. Tails the session JSONL file to extract the last human/assistant messages
-4. Renders a formatted output block with ANSI colors (respects `NO_COLOR` and piped output)
-5. Caches results by file mtime — repeat calls are instant
+1. Finds your git root directory
+2. Checks Claude Code, Codex, and OpenCode for sessions matching that directory
+3. Picks the most recently modified session across all providers
+4. Extracts the summary and last human message
+5. Renders a formatted output block with ANSI colors
 
-Pure zsh + jq. No Node, no Python, no build step. Runs in ~30ms.
+Pure zsh + jq + sqlite3 (ships with macOS). No Node, no Python, no build step.
 
 ## Configuration
 

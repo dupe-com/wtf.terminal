@@ -66,15 +66,17 @@ wtf_format() {
   local time_ago="$3"
   local summary="$4"
   local last_human="$5"
+  local provider="${6:-claude}"
 
-  local sep git_part
-  local c_reset c_dim c_bold_cyan c_dim_label
+  local sep
+  local c_reset c_dim c_bold_cyan c_dim_label c_provider
 
   if wtf_use_color; then
     c_reset=$'\033[0m'
     c_dim=$'\033[2m'
     c_bold_cyan=$'\033[1;36m'
     c_dim_label=$'\033[2;3m'
+    c_provider=$'\033[2m'
   fi
 
   sep="${c_dim}━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━${c_reset}"
@@ -89,6 +91,8 @@ wtf_format() {
   if [[ -n "$time_ago" ]]; then
     header+="  ${c_dim}·${c_reset}  ${time_ago}"
   fi
+
+  header+="  ${c_provider}via ${provider}${c_reset}"
 
   # Build body
   local body=""
