@@ -13,9 +13,8 @@ wtf_codex_find_session() {
   local latest_file=""
 
   # Search recent session files (sorted by mtime, newest first)
-  local session_file
+  local session_file cwd
   for session_file in "$codex_sessions"/**/*.jsonl(N.om[1,50]); do
-    local cwd
     cwd=$(command head -1 "$session_file" 2>/dev/null | command jq -r '.payload.cwd // empty' 2>/dev/null)
     [[ -z "$cwd" ]] && continue
 
