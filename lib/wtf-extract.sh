@@ -48,7 +48,7 @@ wtf_extract_messages() {
 
   # Use jq to extract last human string message and last assistant text block
   local extracted
-  extracted=$(tail -200 "$session_file" | jq -rs '
+  extracted=$(command tail -200 "$session_file" | jq -rs '
     [.[] | select(.message != null)] |
     {
       last_human: (

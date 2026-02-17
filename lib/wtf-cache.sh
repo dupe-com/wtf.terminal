@@ -15,7 +15,7 @@ wtf_cache_read() {
   [[ -f "$session_file" ]] || return 1
 
   local cached_mtime current_mtime
-  cached_mtime=$(head -1 "$cache_file")
+  cached_mtime=$(command head -1 "$cache_file")
   current_mtime=$(stat -f%m "$session_file" 2>/dev/null)
 
   [[ "$cached_mtime" == "$current_mtime" ]] || return 1
