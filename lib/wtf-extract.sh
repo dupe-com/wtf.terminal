@@ -8,7 +8,21 @@ wtf_find_latest_session() {
   local project_dir="$1"
   local index_file="$project_dir/sessions-index.json"
 
-  [[ -f "$index_file" ]] || return 1
+  if [[ ! -f "$index_file" ]]; then
+    # No index — fall back to newest .jsonl file in the project dir
+    local newest
+    local -a jsonl_files=("$project_dir"/*.jsonl(N.om))
+    local newest="${jsonl_files[1]}"
+    [[ -z "$newest" ]] && return 1
+
+    WTF_SESSION_PATH="$newest"
+    WTF_MODIFIED=$(command stat -f%m "$newest" 2>/dev/null)
+    WTF_SUMMARY=""
+    WTF_GIT_BRANCH=""
+    WTF_FIRST_PROMPT=""
+    WTF_PROJECT_PATH=""
+    return 0
+  fi
 
   local result
   result=$(jq -r '

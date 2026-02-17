@@ -23,12 +23,22 @@ wtf_resolve_project_root() {
 wtf_resolve_claude() {
   local target_dir="$1"
   local claude_base="$HOME/.claude/projects"
+  # Claude Code encodes: / → -, . → -
   local encoded="${target_dir//\//-}"
+  encoded="${encoded//./-}"
   local index_file="$claude_base/$encoded/sessions-index.json"
 
   if [[ -f "$index_file" ]]; then
     echo "$claude_base/$encoded"
     return 0
   fi
+
+  # Fallback: project dir exists with .jsonl files but no index yet
+  local project_dir="$claude_base/$encoded"
+  if [[ -d "$project_dir" ]] && command ls "$project_dir"/*.jsonl &>/dev/null; then
+    echo "$project_dir"
+    return 0
+  fi
+
   return 1
 }
