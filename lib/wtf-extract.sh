@@ -10,11 +10,11 @@ wtf_find_latest_session() {
 
   if [[ ! -f "$index_file" ]]; then
     # No index — fall back to newest .jsonl file in the project dir
-    local newest
     local -a jsonl_files=("$project_dir"/*.jsonl(N.om))
     local newest="${jsonl_files[1]}"
     [[ -z "$newest" ]] && return 1
 
+    WTF_SESSION_ID=""
     WTF_SESSION_PATH="$newest"
     WTF_MODIFIED=$(command stat -f%m "$newest" 2>/dev/null)
     WTF_SUMMARY=""
