@@ -81,17 +81,17 @@ wtf_set_tab_color_by_age() {
   now=$(date +%s)
   delta=$(( now - epoch ))
 
-  if (( delta < 3600 )); then
-    # Fresh — green
+  if (( delta < 900 )); then
+    # Fresh  (< 15m)  — green
     wtf_set_tab_color 76 175 80
-  elif (( delta < 86400 )); then
-    # Recent — blue
+  elif (( delta < 1800 )); then
+    # Recent (< 30m)  — blue
     wtf_set_tab_color 66 165 245
-  elif (( delta < 604800 )); then
-    # Stale — amber
+  elif (( delta < 3600 )); then
+    # Stale  (< 1h)   — amber
     wtf_set_tab_color 255 183 77
   else
-    # Old — dim red
+    # Old    (>= 1h)  — dim red
     wtf_set_tab_color 183 28 28
   fi
 }

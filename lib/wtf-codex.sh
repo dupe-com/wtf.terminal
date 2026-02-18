@@ -63,6 +63,16 @@ wtf_codex_find_session() {
   WTF_LAST_HUMAN="${extracted%%	*}"
   WTF_SUMMARY="${extracted#*	}"
 
+  # LLM summarization: condense the raw last-reply into a proper one-liner.
+  # Only runs when WTF_LLM is set and Ollama is reachable (wtf_llm_available
+  # caches the connectivity result so it only hits the network once).
+  if wtf_llm_available 2>/dev/null; then
+    local _llm_ctx="User: ${WTF_LAST_HUMAN}
+Assistant: ${WTF_SUMMARY}"
+    local _llm_sum
+    _llm_sum=$(wtf_llm_summarize "$_llm_ctx") && WTF_SUMMARY="$_llm_sum"
+  fi
+
   # First prompt fallback
   if [[ -z "$WTF_LAST_HUMAN" ]]; then
     WTF_FIRST_PROMPT=$(command head -20 "$latest_file" | command jq -rs '

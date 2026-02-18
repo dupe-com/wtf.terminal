@@ -35,7 +35,7 @@ wtf_resolve_claude() {
 
   # Fallback: project dir exists with .jsonl files but no index yet
   local project_dir="$claude_base/$encoded"
-  if [[ -d "$project_dir" ]] && command ls "$project_dir"/*.jsonl &>/dev/null; then
+  if [[ -d "$project_dir" ]] && [[ -n "$project_dir"/*.jsonl(#qN) ]]; then
     echo "$project_dir"
     return 0
   fi

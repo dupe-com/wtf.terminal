@@ -11,6 +11,7 @@ source "$WTF_DIR/lib/wtf-format.sh"
 source "$WTF_DIR/lib/wtf-terminal.sh"
 source "$WTF_DIR/lib/wtf-codex.sh"
 source "$WTF_DIR/lib/wtf-opencode.sh"
+source "$WTF_DIR/lib/wtf-llm.sh"
 
 # ── Helpers ──────────────────────────────────────────────────────────
 
@@ -115,6 +116,14 @@ _wtf_find_best_session() {
   if [[ "$_wtf_best_provider" == "claude" ]]; then
     wtf_extract_messages "$_wtf_best_session_path"
     _wtf_best_last_human="${WTF_LAST_HUMAN:-$_wtf_best_first_prompt}"
+
+    # When there's no pre-computed summary (no sessions-index.json), ask the LLM.
+    if [[ -z "$_wtf_best_summary" ]] && wtf_llm_available 2>/dev/null; then
+      local _llm_ctx="User: ${_wtf_best_last_human}
+Assistant: ${WTF_LAST_ASSISTANT}"
+      local _llm_sum
+      _llm_sum=$(wtf_llm_summarize "$_llm_ctx") && _wtf_best_summary="$_llm_sum"
+    fi
   fi
 
   return 0
@@ -312,6 +321,10 @@ environment:
   WTF_TERMINAL    detected terminal (iterm2, ghostty, generic)
   NO_COLOR        set to disable colored output
   WTF_DEBUG       set for debug output (or pass --debug)
+  WTF_LLM         set to enable LLM summarization via Ollama
+  WTF_LLM_HOST    Ollama base URL (default: http://localhost:11434)
+  WTF_LLM_MODEL   model to use   (default: llama3.2:1b)
+  WTF_LLM_TIMEOUT curl timeout in seconds (default: 15)
 EOF
 }
 
